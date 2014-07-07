@@ -130,6 +130,10 @@ int main(int argc, char *argv[])
 		return 2;
 	}
 
+    bool all = true; // Tells if all process should start privileged.
+    if(argc > 2 && std::string("rand") == argv[2])
+        all = false;
+
 	// Feedback pipe, so this thread can know what the process are doing.
 	{
 		int pipefds[2];
@@ -138,17 +142,22 @@ int main(int argc, char *argv[])
 		PIPE_WRITE = pipefds[1];
 	}
 
-	// Building all process so all will be privileged.
-	SpecialProcess p0(0);
+	// Building all process.
+    std::uniform_int_distribution<> rand_val(0, NUM_PROCS-1);
+	SpecialProcess p0(all ? 0 : rand_val(rand_gen));
 	std::list<Process> procs;
-
 	procs.emplace_back(1, 1, &p0);
 	{
 		int i;
 		for(i = 2; i < NUM_PROCS - 1; ++i) {
-			procs.emplace_back(i, i, &procs.back());
+            unsigned int initial_value;
+            if(all)
+                initial_value = i;
+            else
+                initial_value = rand_val(rand_gen);
+			procs.emplace_back(i, initial_value, &procs.back());
 		}
-		procs.emplace_back(i, 0, &procs.back());
+		procs.emplace_back(i, all ? 0 : rand_val(rand_gen), &procs.back());
 	}
 	p0.setPrevious(&procs.back());
 
